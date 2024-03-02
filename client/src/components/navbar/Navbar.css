@@ -1,0 +1,76 @@
+.navbar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--brand-color-main);
+    color: var(--brand-color-lightest);
+    padding: 15px 7%;
+    transition: 0.5s;
+}
+.dark .navbar {
+    background: var(--brand-color-darkest);
+    color: var(--brand-color-lightest);
+}
+
+.logo {
+    width: 200px;
+    cursor: pointer;
+}
+
+.navbar ul {
+    flex: 1;
+    list-style: none;
+    text-align: center;
+}
+.navbar ul li {
+    display: inline-block;
+    margin: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.toggle-icon {
+    width: 50px;
+    cursor: pointer;
+    margin-left: 40px;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-radius: 50px;
+    background: var(--brand-color-darkest);
+    transition: 0.5s;
+}
+.dark .search-box {
+    background: var(--brand-color-lightest);
+}
+.search-box input {
+    padding: 6px;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--brand-color-lightest);
+    font-size: 18px;
+    max-width: 200px;
+}
+.dark .search-box input {
+    color: var(--brand-color-darkest);
+}
+.search-box input::placeholder {
+    color: var(--brand-color-light);
+}
+.dark .search-box input::placeholder {
+    color: var(--brand-color-dark);
+}
+.search-icon {
+    font-size: 30px;
+    cursor: pointer;
+    color: var(--brand-color-lightest);
+    transition:0.5s;
+}
+.dark .search-icon {
+    color: var(--brand-color-darkest);
+}

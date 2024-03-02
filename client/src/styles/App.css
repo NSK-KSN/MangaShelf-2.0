@@ -1,0 +1,50 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: sans-serif;
+    list-style: none;
+    a:link { 
+      text-decoration: none; 
+    } 
+    a:visited { 
+      text-decoration: none; 
+    } 
+    a:hover { 
+      text-decoration: none; 
+    } 
+    a:active { 
+      text-decoration: none; 
+    }
+}
+
+#root {
+    display: flex;
+    justify-content: center;
+}
+
+:root {
+    --brand-color-lightest: #F2EBFF;
+    --brand-color-light: #A677F2;
+    --brand-color-main: #7A36E8;
+    --brand-color-dark: #430F96;
+    --brand-color-darkest: #17003D;
+
+    --neutral-color-lightest: #F0EFF3;
+    --neutral-color-light: #B0A6C0;
+    --neutral-color-main: #524863;
+    --neutral-color-dark: #312445;
+    --neutral-color-darkest: #190F29;
+  }
+
+  .App {
+    width: 100vw;
+    min-height: 100vh;
+    background-color: var(--neutral-color-lightest);
+    transition: 0.5s;
+    color: var(--neutral-color-darkest);
+  }
+  .App.dark {
+    background-color: var(--neutral-color-darkest);
+    color: var(--neutral-color-lightest);
+  }
