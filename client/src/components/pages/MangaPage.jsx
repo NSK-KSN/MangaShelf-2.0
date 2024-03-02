@@ -4,10 +4,10 @@ import { useParams } from 'react-router-dom';
 const MangaPage = () => {
     const [data, setData] = useState([]); // Setting initial state as an empty array
     const [isLoading, setIsLoading] = useState(true);
-    const { mal_id } = useParams(); // Extracting the parameter from the URL
+    const { id } = useParams(); // Extracting the parameter from the URL
 
     useEffect(() => {
-        fetch(`http://localhost:8080/other_query/${mal_id}`) // backend URL
+        fetch(`http://localhost:8080/other_query/${id}`) // backend URL
             .then(response => response.json())
             .then(data => {
                 setData(data); // Updating state with fetched data
@@ -15,7 +15,7 @@ const MangaPage = () => {
                 console.log(data);
             })
             .catch(error => console.error('Error fetching data:', error));
-    }, [mal_id]);
+    }, [id]);
 
     return (
         <div>

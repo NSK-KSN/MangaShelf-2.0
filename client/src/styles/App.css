@@ -5,10 +5,12 @@
     font-family: sans-serif;
     list-style: none;
     a:link { 
-      text-decoration: none; 
+      text-decoration: none;
+      color: var(--brand-color-lightest) 
     } 
     a:visited { 
-      text-decoration: none; 
+      text-decoration: none;
+      color: var(--brand-color-lightest)
     } 
     a:hover { 
       text-decoration: none; 

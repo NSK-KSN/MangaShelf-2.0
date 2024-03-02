@@ -40,7 +40,7 @@ function MangaList() {
                 {data.filter((item) => {
                     return search.toLowerCase() === '' ? item : item.title.toLowerCase().includes(search);
                 }).map((item) => (
-                    <li key={item.id} onClick={() => navigate('/manga/' + item.mal_id)}>
+                    <li key={item.id} onClick={() => navigate('/manga/' + item.id)}>
                         <div className='img-container'>
                             <img src={item.cover_image} alt={item.title} />
                         </div>

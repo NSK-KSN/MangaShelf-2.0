@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
+
+	"os"
 )
 
 type Data struct {
@@ -91,14 +94,14 @@ func main() {
 	// Creating a new Gorilla Mux router
 	r := mux.NewRouter()
 
-	// Handler for /other_query/{mal_id} route
-	r.HandleFunc("/other_query/{mal_id}", func(w http.ResponseWriter, r *http.Request) {
-		// Extracting mal_id from the request URL
+	// Handler for /other_query/{id} route
+	r.HandleFunc("/other_query/{id}", func(w http.ResponseWriter, r *http.Request) {
+		// Extracting id from the request URL
 		vars := mux.Vars(r)
-		malID := vars["mal_id"]
+		ID := vars["id"]
 
-		// Query for the database using mal_id
-		rows, err := db.Query("SELECT * FROM manga WHERE mal_id = $1", malID)
+		// Query for the database using id
+		rows, err := db.Query("SELECT * FROM manga WHERE id = $1", ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -123,8 +126,34 @@ func main() {
 		json.NewEncoder(w).Encode(otherData)
 	}).Methods("GET")
 
+	r.HandleFunc("/add-data", func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body
+		decoder := json.NewDecoder(r.Body)
+		var data Data
+		if err := decoder.Decode(&data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		// Insert data into the PostgreSQL database
+		_, err := db.Exec("INSERT INTO manga (title, cover_image, type, publisher, mal_id, score, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+			data.Title, data.CoverImage, data.Type, data.Publisher, data.Mal_Id, data.Score, data.Popularity)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	})
+
 	// Applying CORS middleware to the router
 	handlerr := c.Handler(r)
+
+	// Handle upload requests
+	uploadHandler := c.Handler(http.HandlerFunc(uploadHandler))
+
+	http.Handle("/upload", uploadHandler)
 
 	http.Handle("/", handlerr)
 
@@ -136,4 +165,39 @@ func main() {
 
 	// Start the HTTP server
 	http.ListenAndServe(":8080", nil)
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse the multipart form data
+	err := r.ParseMultipartForm(10 << 20) // 10 MB maximum
+	if err != nil {
+		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Get the file from the form data
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Unable to get file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Create the file on the server
+	f, err := os.Create("./covers/" + handler.Filename)
+	if err != nil {
+		http.Error(w, "Unable to create file", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	// Copy the file contents to the server file
+	_, err = io.Copy(f, file)
+	if err != nil {
+		http.Error(w, "Unable to save file", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with success message
+	w.Write([]byte("File uploaded successfully"))
 }

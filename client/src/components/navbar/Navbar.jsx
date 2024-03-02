@@ -1,7 +1,6 @@
 import React from 'react'
 import './Navbar.css'
 import logo from '../../assets/logo-no-background.png'
-import search_icon from '../../assets/search-w.png'
 import toggle_light_icon from '../../assets/night.png'
 import toggle_dark_icon from '../../assets/day.png'
 import { Link } from 'react-router-dom';
@@ -20,7 +19,7 @@ const Navbar = ({theme, setTheme}) => {
                 <li>Новинки</li>
                 <li><Link to="/browse">Каталог</Link></li>
                 <li>Профиль</li>
-                <li>Администрация</li>
+                <li><Link to="/admin">Администрация</Link></li>
             </ul>
             <div className='search-box'>
                 <input type='text' placeholder='Поиск...'/>
