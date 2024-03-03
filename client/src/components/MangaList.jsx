@@ -10,10 +10,19 @@ function MangaList() {
     useEffect(() => {
         fetch('http://localhost:8080/data') // backend URL
             .then(response => response.json())
-            .then(data => {
+            .then(async data => {
                 // Sorting the data by score before setting it in the state
                 const sortedData = data.sort((a, b) => b.score - a.score);
                 setData(sortedData);
+
+                const newData = await Promise.all(data.map(async item => {
+
+                    const typeResponse = await fetch(`http://localhost:8080/dbquery/types/${item.type_id}`);
+                    const typeData = await typeResponse.json();
+
+                    return { ...item, type_name: typeData.name };
+                }));
+                setData(newData);
             })
             .catch(error => console.error('Error fetching data:', error));
     }, []);
@@ -45,7 +54,7 @@ function MangaList() {
                             <img src={item.cover_image} alt={item.title} />
                         </div>
                         <p>{item.title}</p>
-                        <p>Тип: {item.type}</p>
+                        <p>Тип: {item.type_name}</p>
                         <p>Рейтинг: {item.score}</p>
                     </li>
                 ))}

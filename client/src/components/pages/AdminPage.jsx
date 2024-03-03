@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 function AdminPage() {
   const [formData, setFormData] = useState({
     title: '',
     cover_image: '',
-    type: '',
-    publisher: '',
+    type_id: '',
+    publisher_id: '',
     mal_id: '',
     score: '',
     popularity: ''
   });
+
+  const [publishers, setPublishers] = useState([]);
+  const [types, setTypes] = useState([]);
+
+  useEffect(() => {
+    // Fetch publishers from backend
+    const fetchPublishers = async () => {
+      try {
+        const publishersResponse = await axios.get('http://localhost:8080/dbquery/publishers');
+        setPublishers(publishersResponse.data);
+
+        const typesResponse = await axios.get('http://localhost:8080/dbquery/types');
+        setTypes(typesResponse.data);
+      } catch (error) {
+        console.error('Error fetching publishers:', error);
+      }
+    };
+
+    fetchPublishers();
+  }, []);
 
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -41,15 +61,15 @@ function AdminPage() {
     // Add data to the database
     const formDataDB = {
       ...formData,
-      cover_image: coverImageUrl // Assuming the server responds with the URL of the uploaded image
+      cover_image: coverImageUrl,
+      publisher_id: parseInt(formData.publisher_id),
+      type_id: parseInt(formData.type_id)
     };
     try {
       const addDataResponse = await axios.post('http://localhost:8080/add-data', formDataDB);
       console.log(addDataResponse.data);
-      // Provide feedback to the user indicating success
     } catch (error) {
       console.error('Error adding data:', error);
-      // Provide feedback to the user indicating failure
     }
   };
 
@@ -60,12 +80,23 @@ function AdminPage() {
 
   return (
     <form>
-      {/* Your form inputs */}
       <input type="file" onChange={handleFileChange} />
 
-        <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="Title" />
-      <input type="text" name="type" value={formData.type} onChange={handleChange} placeholder="type" />
-      <input type="text" name="publisher" value={formData.publisher} onChange={handleChange} placeholder="publisher" />
+      <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="Title" />
+      
+      <select name="type_id" value={formData.type_id} onChange={handleChange}>
+        <option value="">Select Type</option>
+        {types.map(type => (
+          <option key={type.id} value={type.id}>{type.name}</option>
+        ))}
+      </select>
+
+      <select name="publisher_id" value={formData.publisher_id} onChange={handleChange}>
+        <option value="">Select Publisher</option>
+        {publishers.map(publisher => (
+          <option key={publisher.id} value={publisher.id}>{publisher.name}</option>
+        ))}
+      </select>
 
       <input type="number" name="score" value={formData.score} onChange={handleChange} placeholder="Score" />
       <input type="number" name="mal_id" value={formData.mal_id} onChange={handleChange} placeholder="malId" />

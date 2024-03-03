@@ -15,14 +15,14 @@ import (
 )
 
 type Data struct {
-	ID         int     `json:"id"`
-	Title      string  `json:"title"`
-	CoverImage string  `json:"cover_image"`
-	Type       string  `json:"type"`
-	Publisher  string  `json:"publisher"`
-	Mal_Id     int     `json:"mal_id"`
-	Score      float64 `json:"score"`
-	Popularity int     `json:"popularity"`
+	ID          int     `json:"id"`
+	Title       string  `json:"title"`
+	CoverImage  string  `json:"cover_image"`
+	TypeID      int     `json:"type_id"`
+	PublisherID int     `json:"publisher_id"`
+	Mal_Id      int     `json:"mal_id"`
+	Score       float64 `json:"score"`
+	Popularity  int     `json:"popularity"`
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 		// Iterating through the rows and appending data to the slice
 		for rows.Next() {
 			var d Data
-			if err := rows.Scan(&d.ID, &d.Title, &d.CoverImage, &d.Type, &d.Publisher, &d.Mal_Id, &d.Score, &d.Popularity); err != nil {
+			if err := rows.Scan(&d.ID, &d.Title, &d.CoverImage, &d.Mal_Id, &d.Score, &d.Popularity, &d.PublisherID, &d.TypeID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -114,7 +114,7 @@ func main() {
 		// Iterating through the rows and appending data to the slice
 		for rows.Next() {
 			var o Data
-			if err := rows.Scan(&o.ID, &o.Title, &o.CoverImage, &o.Type, &o.Publisher, &o.Mal_Id, &o.Score, &o.Popularity); err != nil {
+			if err := rows.Scan(&o.ID, &o.Title, &o.CoverImage, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -137,8 +137,8 @@ func main() {
 		defer r.Body.Close()
 
 		// Insert data into the PostgreSQL database
-		_, err := db.Exec("INSERT INTO manga (title, cover_image, type, publisher, mal_id, score, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-			data.Title, data.CoverImage, data.Type, data.Publisher, data.Mal_Id, data.Score, data.Popularity)
+		_, err := db.Exec("INSERT INTO manga (title, cover_image, type_id, publisher_id, mal_id, score, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+			data.Title, data.CoverImage, data.TypeID, data.PublisherID, data.Mal_Id, data.Score, data.Popularity)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -146,6 +146,75 @@ func main() {
 
 		w.WriteHeader(http.StatusCreated)
 	})
+
+	r.HandleFunc("/dbquery/{tableName}", func(w http.ResponseWriter, r *http.Request) {
+		// Extract the table name from the request URL
+		vars := mux.Vars(r)
+		tableName := vars["tableName"]
+
+		// Query the database to fetch data from the specified table
+		rows, err := db.Query("SELECT id, name FROM " + tableName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		// Create a slice to hold the data
+		var data []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		}
+
+		// Iterate through the rows and append data to the slice
+		for rows.Next() {
+			var item struct {
+				ID   int
+				Name string
+			}
+			if err := rows.Scan(&item.ID, &item.Name); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			data = append(data, struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			}{ID: item.ID, Name: item.Name})
+		}
+
+		// Encode the data as JSON and send it in the response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}).Methods("GET")
+
+	r.HandleFunc("/dbquery/{tableName}/{id}", func(w http.ResponseWriter, r *http.Request) {
+		// Extracting id from the request URL
+		vars := mux.Vars(r)
+		rowID := vars["id"]
+		tableName := vars["tableName"]
+
+		// Query the database using items ID
+		row := db.QueryRow("SELECT id, name FROM "+tableName+" WHERE id = $1", rowID)
+
+		// Creating a struct to hold the item data
+		var item struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		}
+
+		// Scan the row into the struct
+		if err := row.Scan(&item.ID, &item.Name); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Encoding the data as JSON and sending it in the response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(item)
+	}).Methods("GET")
 
 	// Applying CORS middleware to the router
 	handlerr := c.Handler(r)
