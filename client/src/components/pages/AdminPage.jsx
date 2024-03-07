@@ -78,6 +78,38 @@ function AdminPage() {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
+  const fetchDataFromMyAnimeList = async () => {
+    const malId = formData.mal_id;
+    if (!malId) {
+        console.error('mal_id is empty');
+        return;
+    }
+
+    try {
+        const response = await axios.get(`http://localhost:8080/fetch-mal-data/${malId}`);
+        const animeData = response.data;
+        console.log(animeData);
+
+         let typeId = '';
+         if (animeData.media_type === 'manga') {
+             typeId = '1';
+         } else {
+             typeId = '';
+         }
+
+        // Update state with retrieved data
+        setFormData({
+            ...formData,
+            score: animeData.mean,
+            popularity: animeData.num_list_users,
+            type_id: typeId
+        });
+    } catch (error) {
+        console.error('Error fetching data from MyAnimeList:', error);
+    }
+};
+
+
   return (
     <form>
       <input type="file" onChange={handleFileChange} />
@@ -103,6 +135,7 @@ function AdminPage() {
       <input type="number" name="popularity" value={formData.popularity} onChange={handleChange} placeholder="popularity" />
 
       <button type="button" onClick={handleUploadAndAddData}>Upload and Add Data</button>
+      <button type="button" onClick={fetchDataFromMyAnimeList}>Fetch Data from MyAnimeList</button>
     </form>
   );
 }

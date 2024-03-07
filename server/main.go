@@ -216,6 +216,39 @@ func main() {
 		json.NewEncoder(w).Encode(item)
 	}).Methods("GET")
 
+	r.HandleFunc("/fetch-mal-data/{malId}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		malId := vars["malId"]
+
+		// Construct the URL for the MyAnimeList API
+		apiUrl := fmt.Sprintf("https://api.myanimelist.net/v2/manga/%s?fields=num_list_users,mean,media_type", malId)
+
+		// Create a new request to the MyAnimeList API
+		req, err := http.NewRequest("GET", apiUrl, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Set headers for the MyAnimeList API request
+		req.Header.Set("X-MAL-CLIENT-ID", "client_id") // Replace with your actual Client ID
+
+		// Create a new HTTP client
+		client := &http.Client{}
+
+		// Send the request to the MyAnimeList API
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		fmt.Println(resp)
+		// Copy the response from the MyAnimeList API to the response writer
+		io.Copy(w, resp.Body)
+	})
+
 	// Applying CORS middleware to the router
 	handlerr := c.Handler(r)
 
