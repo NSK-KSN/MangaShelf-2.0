@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 
@@ -15,14 +17,15 @@ import (
 )
 
 type Data struct {
-	ID          int     `json:"id"`
-	Title       string  `json:"title"`
-	CoverImage  string  `json:"cover_image"`
-	TypeID      int     `json:"type_id"`
-	PublisherID int     `json:"publisher_id"`
-	Mal_Id      int     `json:"mal_id"`
-	Score       float64 `json:"score"`
-	Popularity  int     `json:"popularity"`
+	ID          int      `json:"id"`
+	Title       string   `json:"title"`
+	CoverImage  []string `json:"cover_image"`
+	TypeID      int      `json:"type_id"`
+	PublisherID int      `json:"publisher_id"`
+	Mal_Id      int      `json:"mal_id"`
+	Score       float64  `json:"score"`
+	Popularity  int      `json:"popularity"`
+	StatusID    int      `json:"status_id"`
 }
 
 func main() {
@@ -61,8 +64,8 @@ func main() {
 
 	// Creating a new HTTP handler with the CORS middleware
 	handler := c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
 		// Fetching data from the database
 		rows, err := db.Query("SELECT * FROM manga")
 		if err != nil {
@@ -76,15 +79,25 @@ func main() {
 
 		// Iterating through the rows and appending data to the slice
 		for rows.Next() {
-			var d Data
-			if err := rows.Scan(&d.ID, &d.Title, &d.CoverImage, &d.Mal_Id, &d.Score, &d.Popularity, &d.PublisherID, &d.TypeID); err != nil {
+			var o Data
+			var coverImageBytes []byte // Define a variable to scan the cover_image as bytes
+
+			if err := rows.Scan(&o.ID, &o.Title, &coverImageBytes, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID, &o.StatusID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			data = append(data, d)
-		}
 
-		fmt.Println(data)
+			// Convert the cover_image bytes to a string
+			coverImageStr := string(coverImageBytes)
+
+			// Remove the "{" and "}" brackets from the string
+			coverImageStr = strings.Trim(coverImageStr, "{}")
+
+			// Split the string into an array of strings
+			o.CoverImage = strings.Split(coverImageStr, ",")
+
+			data = append(data, o)
+		}
 
 		// Encoding the data as JSON and sending it in the response
 		w.Header().Set("Content-Type", "application/json")
@@ -114,10 +127,22 @@ func main() {
 		// Iterating through the rows and appending data to the slice
 		for rows.Next() {
 			var o Data
-			if err := rows.Scan(&o.ID, &o.Title, &o.CoverImage, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID); err != nil {
+			var coverImageBytes []byte // Define a variable to scan the cover_image as bytes
+
+			if err := rows.Scan(&o.ID, &o.Title, &coverImageBytes, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID, &o.StatusID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
+			// Convert the cover_image bytes to a string
+			coverImageStr := string(coverImageBytes)
+
+			// Remove the "{" and "}" brackets from the string
+			coverImageStr = strings.Trim(coverImageStr, "{}")
+
+			// Split the string into an array of strings
+			o.CoverImage = strings.Split(coverImageStr, ",")
+
 			otherData = append(otherData, o)
 		}
 
@@ -136,9 +161,14 @@ func main() {
 		}
 		defer r.Body.Close()
 
+		// Convert the array of strings to a slice of cover images
+		coverImages := make([]string, 0, len(data.CoverImage))
+		coverImages = append(coverImages, data.CoverImage...)
+
 		// Insert data into the PostgreSQL database
-		_, err := db.Exec("INSERT INTO manga (title, cover_image, type_id, publisher_id, mal_id, score, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-			data.Title, data.CoverImage, data.TypeID, data.PublisherID, data.Mal_Id, data.Score, data.Popularity)
+		_, err := db.Exec("INSERT INTO manga (title, cover_image, type_id, publisher_id, mal_id, score, popularity, status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+			data.Title, pq.Array(coverImages), data.TypeID, data.PublisherID, data.Mal_Id, data.Score, data.Popularity, data.StatusID)
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -247,6 +277,85 @@ func main() {
 		fmt.Println(resp)
 		// Copy the response from the MyAnimeList API to the response writer
 		io.Copy(w, resp.Body)
+	})
+
+	r.HandleFunc("/fetch-manga-titles", func(w http.ResponseWriter, r *http.Request) {
+		// Query the database to fetch manga titles
+		rows, err := db.Query("SELECT title FROM manga")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		// Create a slice to hold the manga titles
+		var titles []string
+
+		// Iterate through the rows and append titles to the slice
+		for rows.Next() {
+			var title string
+			if err := rows.Scan(&title); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			titles = append(titles, title)
+		}
+
+		// Encode the titles as JSON and send the response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(titles); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}).Methods("GET")
+
+	r.HandleFunc("/upload-cover-image", func(w http.ResponseWriter, r *http.Request) {
+		// Parse the multipart form data
+		err := r.ParseMultipartForm(10 << 20) // 10 MB maximum
+		if err != nil {
+			http.Error(w, "Unable to parse form", http.StatusBadRequest)
+			return
+		}
+
+		// Get the file from the form data
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Unable to get file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Extract other form data
+		title := r.FormValue("title")
+		volumeNumber := r.FormValue("volumeNumber")
+
+		// Create the file on the server
+		f, err := os.Create("./covers/" + handler.Filename)
+		if err != nil {
+			http.Error(w, "Unable to create file", http.StatusInternalServerError)
+			return
+		}
+		defer f.Close()
+
+		// Copy the file contents to the server file
+		_, err = io.Copy(f, file)
+		if err != nil {
+			http.Error(w, "Unable to save file", http.StatusInternalServerError)
+			return
+		}
+
+		// Construct the URL string for the cover image
+		coverImageURL := fmt.Sprintf("http://localhost:8080/covers/%s", handler.Filename)
+
+		// Update the database
+		_, err = db.Exec("UPDATE manga SET cover_image[$1] = $2 WHERE title = $3", volumeNumber, coverImageURL, title)
+		if err != nil {
+			http.Error(w, "Unable to update the database", http.StatusInternalServerError)
+			return
+		}
+
+		// Respond with success message
+		w.Write([]byte("File uploaded successfully"))
 	})
 
 	// Applying CORS middleware to the router

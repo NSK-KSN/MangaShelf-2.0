@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './MangaList.css';
+import '../styles/MangaList.css';
 import { useNavigate } from 'react-router-dom';
 
 function MangaList() {
@@ -51,7 +51,7 @@ function MangaList() {
                 }).map((item) => (
                     <li key={item.id} onClick={() => navigate('/manga/' + item.id)}>
                         <div className='img-container'>
-                            <img src={item.cover_image} alt={item.title} />
+                            <img src={item.cover_image[0]} alt={item.title} />
                         </div>
                         <p>{item.title}</p>
                         <p>Тип: {item.type_name}</p>

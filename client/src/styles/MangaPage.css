@@ -1,0 +1,35 @@
+img {
+    height: 100%;
+    max-width: 400px;
+    
+  }
+  
+
+.carousel-item {
+    height: 230px;
+    width: 160px;
+    text-align: center;
+    border-radius: 15px;
+    border: solid var(--neutral-color-light);
+    transition: 0.5s;
+}
+.carousel-item:hover {
+    border: solid var(--brand-color-main);
+    cursor: pointer;
+}
+
+.carousel-item img{
+    height: 200px;
+    overflow: hidden;
+    padding-top: 10%;
+}
+
+.carousel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.manga-page {
+    margin: 20px;
+}
