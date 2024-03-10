@@ -80,7 +80,7 @@ function AddNewVolume() {
         <select name="title_id" value={formData.title_id} onChange={handleChange}>
           <option value="">Select Type</option>
             {mangaTitles.map(mangaTitle => (
-              <option key={mangaTitle.id} value={mangaTitle.id}>{mangaTitle.name}</option>
+              <option key={mangaTitle.id} value={mangaTitle.id}>{mangaTitle.name} ({mangaTitle.type})</option>
             ))}
         </select>
 

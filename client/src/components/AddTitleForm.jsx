@@ -4,7 +4,6 @@ import axios from 'axios';
 function AddTitleForm() {
   const [formData, setFormData] = useState({
     title: '',
-    cover_image: [], // Initialize as an empty array
     type_id: '',
     publisher_id: '',
     mal_id: '',
@@ -37,44 +36,17 @@ function AddTitleForm() {
     fetchPublishers();
   }, []);
 
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
-  };
-
   const handleUploadAndAddData = async () => {
-    // Upload the file
-    const formDataFile = new FormData();
-    formDataFile.append('file', selectedFile);
-    try {
-      const response = await axios.post('http://localhost:8080/upload', formDataFile, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      console.log(response.data);
-      // Handle successful upload
-    } catch (error) {
-      console.error('Error:', error);
-      // Handle upload error
-    }
-
-    const fileName = selectedFile.name;
-    const coverImageUrl = `http://localhost:8080/covers/${fileName}`;
-    // Add cover image data to the first element of the array
-    const updatedCoverImages = [coverImageUrl, ...formData.cover_image];
-
+    console.log(formData)
     // Add data to the database
     const formDataDB = {
       ...formData,
-      cover_image: updatedCoverImages, // Update cover_image data
-      publisher_id: parseInt(formData.publisher_id),
-      type_id: parseInt(formData.type_id),
-      status_id: parseInt(formData.status_id)
+      publisher_id: formData.publisher_id,
+      type_id: formData.type_id,
+      status_id: formData.status_id
     };
     try {
-      const addDataResponse = await axios.post('http://localhost:8080/add-data', formDataDB);
+      const addDataResponse = await axios.post('http://localhost:8080/upload-data', formDataDB);
       console.log(addDataResponse.data);
     } catch (error) {
       console.error('Error adding data:', error);
@@ -130,7 +102,6 @@ function AddTitleForm() {
     <div>
       <h1>Add new catalogue entry</h1>
     <form>
-      <input type="file" onChange={handleFileChange} />
 
       <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="Title" />
 

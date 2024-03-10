@@ -5,6 +5,7 @@ const AdminPage = () => (
     <>
       <div>
         <AddNewVolume/>
+        <AddTitleForm/>
       </div>
     </>
   );

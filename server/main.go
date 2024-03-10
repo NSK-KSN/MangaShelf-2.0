@@ -233,6 +233,28 @@ func main() {
 		w.WriteHeader(http.StatusCreated)
 	})
 
+	r.HandleFunc("/upload-data", func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body
+		decoder := json.NewDecoder(r.Body)
+		var data Data
+		if err := decoder.Decode(&data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		// Insert data into the PostgreSQL database
+		_, err := db.Exec("INSERT INTO manga (title, type_id, publisher_id, mal_id, score, popularity, status_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+			data.Title, data.TypeID, data.PublisherID, data.Mal_Id, data.Score, data.Popularity, data.StatusID)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	})
+
 	r.HandleFunc("/add-datas", func(w http.ResponseWriter, r *http.Request) {
 		// Parse the request body
 		decoder := json.NewDecoder(r.Body)
@@ -368,7 +390,9 @@ func main() {
 	r.HandleFunc("/fetch-manga-titles", func(w http.ResponseWriter, r *http.Request) {
 
 		// Query the database to fetch manga titles
-		rows, err := db.Query("SELECT id, title FROM manga")
+		rows, err := db.Query(`SELECT m.id, m.title, t.types
+								FROM manga m
+								LEFT JOIN types t ON m.type_id = t.id`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -379,6 +403,7 @@ func main() {
 		var data []struct {
 			ID   int    `json:"id"`
 			Name string `json:"name"`
+			Type string `json:"type"`
 		}
 
 		// Iterate through the rows and append data to the slice
@@ -386,15 +411,17 @@ func main() {
 			var item struct {
 				ID   int
 				Name string
+				Type string
 			}
-			if err := rows.Scan(&item.ID, &item.Name); err != nil {
+			if err := rows.Scan(&item.ID, &item.Name, &item.Type); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			data = append(data, struct {
 				ID   int    `json:"id"`
 				Name string `json:"name"`
-			}{ID: item.ID, Name: item.Name})
+				Type string `json:"type"`
+			}{ID: item.ID, Name: item.Name, Type: item.Type})
 		}
 
 		// Encode the data as JSON and send it in the response
