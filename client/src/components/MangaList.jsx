@@ -14,15 +14,6 @@ function MangaList() {
                 // Sorting the data by score before setting it in the state
                 const sortedData = data.sort((a, b) => b.score - a.score);
                 setData(sortedData);
-
-                const newData = await Promise.all(data.map(async item => {
-
-                    const typeResponse = await fetch(`http://localhost:8080/dbquery/types/${item.type_id}`);
-                    const typeData = await typeResponse.json();
-
-                    return { ...item, type_name: typeData.name };
-                }));
-                setData(newData);
             })
             .catch(error => console.error('Error fetching data:', error));
     }, []);
@@ -51,10 +42,10 @@ function MangaList() {
                 }).map((item) => (
                     <li key={item.id} onClick={() => navigate('/manga/' + item.id)}>
                         <div className='img-container'>
-                            <img src={item.cover_image[0]} alt={item.title} />
+                            <img src={item.cover_link} alt={item.title} />
                         </div>
                         <p>{item.title}</p>
-                        <p>Тип: {item.type_name}</p>
+                        <p>Тип: {item.type_id}</p>
                         <p>Рейтинг: {item.score}</p>
                     </li>
                 ))}

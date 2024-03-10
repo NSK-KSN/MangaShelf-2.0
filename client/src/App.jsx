@@ -4,6 +4,7 @@ import Home from './components/pages/Home.jsx';
 import Browse from './components/pages/Browse.jsx';
 import MangaPage from './components/pages/MangaPage.jsx';
 import AdminPage from './components/pages/AdminPage.jsx';
+import ReleaseSchedule from './components/pages/ReleaseSchedule.jsx';
 import './styles/App.css';
 import React, { useEffect, useState } from 'react'
 
@@ -24,7 +25,8 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="browse" element={<Browse />} />
           <Route path="/manga/:id" element={<MangaPage/>} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/releases" element={<ReleaseSchedule />} />
         </Routes>
       </BrowserRouter>
     </div> 

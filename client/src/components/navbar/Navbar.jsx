@@ -16,7 +16,7 @@ const Navbar = ({theme, setTheme}) => {
         <div className='navbar'>
             <Link to="/"><img src={logo} alt="" className='logo' /></Link>
             <ul>
-                <li>Новинки</li>
+                <li><Link to="/releases">График релизов</Link></li>
                 <li><Link to="/browse">Каталог</Link></li>
                 <li>Профиль</li>
                 <li><Link to="/admin">Администрация</Link></li>

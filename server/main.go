@@ -6,26 +6,38 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 
 	"os"
+
+	"strconv"
 )
 
 type Data struct {
 	ID          int      `json:"id"`
 	Title       string   `json:"title"`
-	CoverImage  []string `json:"cover_image"`
-	TypeID      int      `json:"type_id"`
-	PublisherID int      `json:"publisher_id"`
+	CoverLink   string   `json:"cover_link"`
+	TypeID      string   `json:"type_id"`
+	PublisherID string   `json:"publisher_id"`
 	Mal_Id      int      `json:"mal_id"`
 	Score       float64  `json:"score"`
 	Popularity  int      `json:"popularity"`
-	StatusID    int      `json:"status_id"`
+	StatusID    string   `json:"status_id"`
+	Volumes     []Volume `json:"volumes"`
+}
+
+// Release represents a release entry in the database
+type Volume struct {
+	ID           int    `json:"id"`
+	Title_ID     string `json:"title_id"`
+	VolumeNumber int    `json:"volume_number"`
+	ReleaseDate  string `json:"release_date"`
+	CoverLink    string `json:"cover_link"`
+	Title        string `json:"title"`
 }
 
 func main() {
@@ -61,40 +73,43 @@ func main() {
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
+	// Creating a new Gorilla Mux router
+	r := mux.NewRouter()
 
-	// Creating a new HTTP handler with the CORS middleware
-	handler := c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-		// Fetching data from the database
-		rows, err := db.Query("SELECT * FROM manga")
+		rows, err := db.Query(`
+		SELECT m.id, m.title, v.cover_link, m.mal_id, m.score, m.popularity, p.publishers, t.types, s.status
+		FROM manga m
+		LEFT JOIN types t ON m.type_id = t.id
+		LEFT JOIN status s ON m.status_id = s.id
+		LEFT JOIN publishers p ON m.publisher_id = p.id
+		LEFT JOIN volumes v ON m.id = v.title_id WHERE v.volume_number = '1'
+`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		// Creating a slice to hold the data
 		var data []Data
 
-		// Iterating through the rows and appending data to the slice
 		for rows.Next() {
 			var o Data
-			var coverImageBytes []byte // Define a variable to scan the cover_image as bytes
+			var coverLink sql.NullString // Use sql.NullString to handle NULL values
 
-			if err := rows.Scan(&o.ID, &o.Title, &coverImageBytes, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID, &o.StatusID); err != nil {
+			if err := rows.Scan(&o.ID, &o.Title, &coverLink, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID, &o.StatusID); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			// Convert the cover_image bytes to a string
-			coverImageStr := string(coverImageBytes)
-
-			// Remove the "{" and "}" brackets from the string
-			coverImageStr = strings.Trim(coverImageStr, "{}")
-
-			// Split the string into an array of strings
-			o.CoverImage = strings.Split(coverImageStr, ",")
+			// Check if coverImage is valid before using its value
+			if coverLink.Valid {
+				o.CoverLink = coverLink.String
+			} else {
+				o.CoverLink = "" // Set a default value if coverImage is NULL
+			}
 
 			data = append(data, o)
 		}
@@ -102,10 +117,39 @@ func main() {
 		// Encoding the data as JSON and sending it in the response
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(data)
-	}))
+	}).Methods("GET")
 
-	// Creating a new Gorilla Mux router
-	r := mux.NewRouter()
+	r.HandleFunc("/releases-data", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		rows, err := db.Query(`
+		SELECT v.id, v.title_id, m.title, v.volume_number, v.release_date, v.cover_link
+		FROM volumes v
+		LEFT JOIN manga m ON v.title_id = m.id
+`)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var data []Volume
+
+		for rows.Next() {
+			var o Volume
+
+			if err := rows.Scan(&o.ID, &o.Title_ID, &o.Title, &o.VolumeNumber, &o.ReleaseDate, &o.CoverLink); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			data = append(data, o)
+		}
+
+		// Encoding the data as JSON and sending it in the response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(data)
+	}).Methods("GET")
 
 	// Handler for /other_query/{id} route
 	r.HandleFunc("/other_query/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -113,42 +157,55 @@ func main() {
 		vars := mux.Vars(r)
 		ID := vars["id"]
 
-		// Query for the database using id
-		rows, err := db.Query("SELECT * FROM manga WHERE id = $1", ID)
+		// Query the database to fetch manga details
+		mangaQuery := `
+        SELECT m.id, m.title, m.mal_id, m.score, m.popularity, p.publishers, t.types, s.status
+		FROM manga m
+		LEFT JOIN types t ON m.type_id = t.id
+		LEFT JOIN status s ON m.status_id = s.id
+		LEFT JOIN publishers p ON m.publisher_id = p.id WHERE m.id = $1
+    `
+		mangaRow := db.QueryRow(mangaQuery, ID)
+		var mangaData Data
+		err := mangaRow.Scan(&mangaData.ID, &mangaData.Title, &mangaData.Mal_Id, &mangaData.Score, &mangaData.Popularity, &mangaData.PublisherID, &mangaData.TypeID, &mangaData.StatusID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
-		// Creating a slice to hold the data for the other query
-		var otherData []Data
+		// Query the database to fetch associated volume cover links
+		volumesQuery := `
+        SELECT cover_link, volume_number
+        FROM volumes
+        WHERE title_id = $1
+    `
+		volumesRows, err := db.Query(volumesQuery, ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer volumesRows.Close()
+
+		// Slice to hold volume data
+		var volumes []Volume
 
 		// Iterating through the rows and appending data to the slice
-		for rows.Next() {
-			var o Data
-			var coverImageBytes []byte // Define a variable to scan the cover_image as bytes
-
-			if err := rows.Scan(&o.ID, &o.Title, &coverImageBytes, &o.Mal_Id, &o.Score, &o.Popularity, &o.PublisherID, &o.TypeID, &o.StatusID); err != nil {
+		for volumesRows.Next() {
+			var volume Volume
+			err := volumesRows.Scan(&volume.CoverLink, &volume.VolumeNumber)
+			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-
-			// Convert the cover_image bytes to a string
-			coverImageStr := string(coverImageBytes)
-
-			// Remove the "{" and "}" brackets from the string
-			coverImageStr = strings.Trim(coverImageStr, "{}")
-
-			// Split the string into an array of strings
-			o.CoverImage = strings.Split(coverImageStr, ",")
-
-			otherData = append(otherData, o)
+			volumes = append(volumes, volume)
 		}
 
-		// Encoding the data as JSON and sending it in the response for the other query
+		// Assign volumes to mangaData
+		mangaData.Volumes = volumes
+
+		// Encoding the data as JSON and sending it in the response
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(otherData)
+		json.NewEncoder(w).Encode(mangaData)
 	}).Methods("GET")
 
 	r.HandleFunc("/add-data", func(w http.ResponseWriter, r *http.Request) {
@@ -162,12 +219,41 @@ func main() {
 		defer r.Body.Close()
 
 		// Convert the array of strings to a slice of cover images
-		coverImages := make([]string, 0, len(data.CoverImage))
-		coverImages = append(coverImages, data.CoverImage...)
+		coverImages := make([]string, 0, len(data.CoverLink))
 
 		// Insert data into the PostgreSQL database
 		_, err := db.Exec("INSERT INTO manga (title, cover_image, type_id, publisher_id, mal_id, score, popularity, status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
 			data.Title, pq.Array(coverImages), data.TypeID, data.PublisherID, data.Mal_Id, data.Score, data.Popularity, data.StatusID)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	r.HandleFunc("/add-datas", func(w http.ResponseWriter, r *http.Request) {
+		// Parse the request body
+		decoder := json.NewDecoder(r.Body)
+		var data Volume
+		if err := decoder.Decode(&data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		// Parse and format the release date
+		releaseDate, err := time.Parse("2006-01", data.ReleaseDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		formattedReleaseDate := releaseDate.Format("2006-01-02") // Assuming you want to use the first day of the month
+
+		// Insert data into the PostgreSQL database
+		_, err = db.Exec("INSERT INTO volumes (title_id, volume_number, release_date, cover_link) VALUES ($1, $2, $3, $4)",
+			data.Title_ID, data.VolumeNumber, formattedReleaseDate, data.CoverLink)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -183,7 +269,7 @@ func main() {
 		tableName := vars["tableName"]
 
 		// Query the database to fetch data from the specified table
-		rows, err := db.Query("SELECT id, name FROM " + tableName)
+		rows, err := db.Query("SELECT id, " + tableName + " FROM " + tableName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -227,7 +313,7 @@ func main() {
 		tableName := vars["tableName"]
 
 		// Query the database using items ID
-		row := db.QueryRow("SELECT id, name FROM "+tableName+" WHERE id = $1", rowID)
+		row := db.QueryRow("SELECT id, "+tableName+" FROM "+tableName+" WHERE id = $1", rowID)
 
 		// Creating a struct to hold the item data
 		var item struct {
@@ -280,30 +366,40 @@ func main() {
 	})
 
 	r.HandleFunc("/fetch-manga-titles", func(w http.ResponseWriter, r *http.Request) {
+
 		// Query the database to fetch manga titles
-		rows, err := db.Query("SELECT title FROM manga")
+		rows, err := db.Query("SELECT id, title FROM manga")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		// Create a slice to hold the manga titles
-		var titles []string
+		// Create a slice to hold the data
+		var data []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		}
 
-		// Iterate through the rows and append titles to the slice
+		// Iterate through the rows and append data to the slice
 		for rows.Next() {
-			var title string
-			if err := rows.Scan(&title); err != nil {
+			var item struct {
+				ID   int
+				Name string
+			}
+			if err := rows.Scan(&item.ID, &item.Name); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			titles = append(titles, title)
+			data = append(data, struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			}{ID: item.ID, Name: item.Name})
 		}
 
-		// Encode the titles as JSON and send the response
+		// Encode the data as JSON and send it in the response
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(titles); err != nil {
+		if err := json.NewEncoder(w).Encode(data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -368,9 +464,6 @@ func main() {
 
 	http.Handle("/", handlerr)
 
-	// CORS-enabled handler with the default ServeMux
-	http.Handle("/data", handler)
-
 	// Serve images
 	http.Handle("/covers/", http.StripPrefix("/covers/", http.FileServer(http.Dir("path/to/the/folder"))))
 
@@ -411,4 +504,20 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Respond with success message
 	w.Write([]byte("File uploaded successfully"))
+}
+
+// convertVolumeNumberToInt converts the volume number string to an integer index.
+func convertVolumeNumberToInt(volumeNumber string) int {
+	// Parse the volume number string to an integer
+	volumeIndex, err := strconv.Atoi(volumeNumber)
+	if err != nil {
+		// If there's an error parsing the string to an integer, return -1
+		// You can handle this error differently based on your application's requirements
+		return -1
+	}
+
+	// Subtract 1 from the volume number to convert it to a zero-based index
+	volumeIndex-- // Assuming volume numbers are 1-indexed in the database
+
+	return volumeIndex
 }

@@ -1,11 +1,10 @@
+import AddNewVolume from '../AddNewVolume.jsx';
 import AddTitleForm from '../AddTitleForm.jsx';
-import CoverImageUploader from '../CoverImageUploader.jsx';
 
 const AdminPage = () => (
     <>
       <div>
-        <AddTitleForm/>
-        <CoverImageUploader/>
+        <AddNewVolume/>
       </div>
     </>
   );

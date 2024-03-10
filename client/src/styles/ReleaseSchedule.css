@@ -1,0 +1,41 @@
+.list-of-manga {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.list-of-manga p{
+    margin: 5px 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.manga-container {
+    width: 200px;
+    height: auto;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.5s;
+    margin-top: 20px;
+}
+
+.manga-container:hover {
+    box-shadow: 0 0 10px var(--brand-color-main);
+}
+
+.list-of-manga img {
+    width: 100%;
+    height: 285px;
+    overflow: hidden;
+}
+
+.release-page-container {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 auto; 
+    width: 75%;
+}
